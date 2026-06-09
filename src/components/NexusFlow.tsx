@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ShieldAlert, CheckCircle2, ShieldCheck, Camera, Fingerprint } from 'lucide-react';
 
 type FlowState = 'dashboard' | 'friction' | 'nexus-processing' | 'success';
