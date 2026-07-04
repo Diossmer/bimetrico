@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { ShieldAlert, CheckCircle2, ShieldCheck, Camera, Fingerprint } from 'lucide-react';
+import pruebaImg from '../prueba.jpg';
 
 type FlowState = 'dashboard' | 'friction' | 'nexus-processing' | 'success';
 
-const MOCK_FACE_URL = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400&h=500';
+const MOCK_FACE_URL = pruebaImg;
 
 export default function NexusFlow() {
   const [flow, setFlow] = useState<FlowState>('dashboard');
   const [logs, setLogs] = useState<string[]>([]);
-  
+
   const handleAuthorize = () => {
     setFlow('friction');
   };
@@ -92,7 +93,7 @@ export default function NexusFlow() {
               Procesando Local
             </span>
           </div>
-          
+
           <div className="camera-container">
             <div className="camera-view">
               <div className="camera-label">
@@ -112,7 +113,7 @@ export default function NexusFlow() {
           <div className="terminal">
             {logs.map((log, index) => (
               <div key={index} className="terminal-line">
-                {log.startsWith('[OK]') || log.startsWith('[SUCCESS]') 
+                {log.startsWith('[OK]') || log.startsWith('[SUCCESS]')
                   ? <span style={{ color: 'var(--success)' }}>{log}</span>
                   : <span style={{ color: 'var(--text-secondary)' }}>{log}</span>}
               </div>
@@ -126,7 +127,7 @@ export default function NexusFlow() {
         <div className="flow-content animate-fade" style={{ textAlign: 'center' }}>
           <CheckCircle2 size={64} color="var(--success)" style={{ margin: '0 auto 16px' }} />
           <h2 style={{ color: 'var(--success)', marginBottom: '8px' }}>Liberación Exitosa</h2>
-          
+
           <div className="receipt">
             <p style={{ fontStyle: 'italic', color: 'var(--text-primary)', margin: 0 }}>
               "Identidad Confirmada (Latencia: 1.2s). Hash de transacción: 0x9a8b7... Retiro de fondos autorizado hacia cuenta destino"
