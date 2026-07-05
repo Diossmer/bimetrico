@@ -1,42 +1,114 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ShieldAlert, CheckCircle2, ShieldCheck, Camera, Fingerprint } from 'lucide-react';
-import pruebaImg from '../prueba.jpg';
+import { useCamera } from '../hooks/useCamera';
 
 type FlowState = 'dashboard' | 'friction' | 'nexus-processing' | 'success';
-
-const MOCK_FACE_URL = pruebaImg;
 
 export default function NexusFlow() {
   const [flow, setFlow] = useState<FlowState>('dashboard');
   const [logs, setLogs] = useState<string[]>([]);
+  const { videoRef, stream, error, startCamera, stopCamera } = useCamera();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [kycResult, setKycResult] = useState<any>(null);
 
   const handleAuthorize = () => {
     setFlow('friction');
   };
 
-  const handleStartNexus = () => {
+  const handleStartNexus = async () => {
     setFlow('nexus-processing');
+    await startCamera();
     simulateProcessing();
   };
 
-  const simulateProcessing = () => {
+  useEffect(() => {
+    let animationFrameId: number;
+    
+    if (flow === 'nexus-processing' && stream && videoRef.current && canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d');
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+
+      const renderLoop = () => {
+        if (video.readyState === video.HAVE_ENOUGH_DATA && ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+          
+          for (let i = 0; i < data.length; i += 4) {
+            data[i]     = Math.min(255, data[i]     * 1.05); // R
+            data[i + 1] = Math.min(255, data[i + 1] * 1.08); // G  
+            data[i + 2] = Math.min(255, data[i + 2] * 1.15); // B
+          }
+          ctx.putImageData(imageData, 0, 0);
+        }
+        animationFrameId = requestAnimationFrame(renderLoop);
+      };
+      
+      video.play();
+      renderLoop();
+    }
+
+    return () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    };
+  }, [flow, stream, videoRef, canvasRef]);
+
+  const simulateProcessing = async () => {
+    setLogs(['Conectando con Backend NEXUS...']);
+    
+    // Prueba de conexión al Backend
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST'
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setLogs(prev => [...prev, `[SUCCESS] Conexión DB. Token: ${data.token.substring(0, 20)}...`]);
+      } else {
+        setLogs(prev => [...prev, '[ERROR] Fallo al conectar con backend']);
+      }
+    } catch (e) {
+      setLogs(prev => [...prev, '[ERROR] Servidor backend apagado o inaccesible']);
+    }
+
     const sequence = [
-      '[OK] Balance de blancos ajustado...',
-      '[OK] Ruido reducido...',
-      '[OK] Paquete enviado a pasarela KYC'
+      '[OK] Capturando frame de video...',
+      '[OK] Aplicando balance de blancos en Edge...',
+      '[OK] Paquete biométrico enviado a pasarela KYC'
     ];
 
     let i = 0;
-    setLogs([]);
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       const currentMsg = sequence[i];
       setLogs(prev => [...prev, currentMsg]);
       i++;
       if (i === sequence.length) {
         clearInterval(interval);
-        setTimeout(() => setFlow('success'), 1000);
+        
+        // Enviar la imagen al Backend KYC
+        if (canvasRef.current) {
+          const base64 = canvasRef.current.toDataURL('image/jpeg', 0.85);
+          try {
+            const res = await fetch('/api/kyc/validate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ imageBase64: base64 })
+            });
+            const kycData = await res.json();
+            setKycResult(kycData);
+            setLogs(prev => [...prev, `[SUCCESS] Identidad validada. Score: ${kycData.score}`]);
+          } catch (err) {
+            setLogs(prev => [...prev, '[ERROR] Fallo en la validación biométrica']);
+          }
+        }
+        
+        setTimeout(() => {
+            stopCamera();
+            setFlow('success');
+        }, 1500);
       }
-    }, 800);
+    }, 1500);
   };
 
   return (
@@ -99,13 +171,30 @@ export default function NexusFlow() {
               <div className="camera-label">
                 <Camera size={14} /> RAW (Típico)
               </div>
-              <img src={MOCK_FACE_URL} className="camera-image raw-filter" alt="Raw Camera" />
+              {error ? (
+                <div style={{ color: 'red', padding: '20px', textAlign: 'center' }}>{error}</div>
+              ) : (
+                <video 
+                  ref={videoRef} 
+                  autoPlay 
+                  playsInline 
+                  muted 
+                  className="camera-image" 
+                  style={{ objectFit: 'cover' }}
+                />
+              )}
             </div>
             <div className="camera-view">
               <div className="camera-label" style={{ background: 'rgba(0, 240, 255, 0.2)', color: 'var(--accent)' }}>
                 <Fingerprint size={14} /> NEXUS Opt.
               </div>
-              <img src={MOCK_FACE_URL} className="camera-image nexus-filter" alt="Nexus Corrected" />
+              <canvas 
+                ref={canvasRef} 
+                width={400} 
+                height={500} 
+                className="camera-image nexus-filter"
+                style={{ objectFit: 'cover' }}
+              />
               <div className="scanner-line"></div>
             </div>
           </div>
